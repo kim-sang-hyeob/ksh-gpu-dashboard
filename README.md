@@ -48,6 +48,8 @@ workspace를 다시 시작하면 `/root`의 코드와 설정은 남지만 프로
 
 ## VESSL 자동 재시작
 
+운영 저장소: `https://github.com/kim-sang-hyeob/ksh-gpu-dashboard`
+
 `.github/workflows/vessl-autostart.yml`은 매시간 17분에 등록된 workspace를 확인하고 상태가
 정확히 `stopped`일 때만 init script를 설정하고 공식 `vessl workspace start ID`를 요청한다.
 `stopping`, `pending`, `running`과 조회 오류는 중지로 추정하지 않는다. 실행 결과에는 workspace
@@ -72,3 +74,6 @@ Repository variables:
 변수를 활성화한다. VESSL이 workspace를 다시 띄우면 저장된 init script가
 `/root/work/server-setup/on-workspace-start.sh`를 실행해 비영속 작업 폴더와 대시보드 에이전트를
 복구한다.
+
+2026-09-18 기준 dry-run과 실제 모드 확인이 모두 성공했으며 `AUTO_START_ENABLED=true`다.
+실제 모드 확인 당시 두 workspace는 `running`, 시작 요청과 실패는 각각 0건이었다.
