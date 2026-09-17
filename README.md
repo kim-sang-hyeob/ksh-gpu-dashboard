@@ -77,3 +77,33 @@ Repository variables:
 
 2026-09-18 기준 dry-run과 실제 모드 확인이 모두 성공했으며 `AUTO_START_ENABLED=true`다.
 실제 모드 확인 당시 두 workspace는 `running`, 시작 요청과 실패는 각각 0건이었다.
+
+## 실험 실행기
+
+두 서버에는 `ksh-run`을 `/usr/local/bin/ksh-run`으로 설치한다. 정식 실험은 SSH 종료 후에도
+실행되며 `/root/runs/<project>/<run_id>/`에 메타데이터, 재현 명령, 환경, 로그를 만든다. 종료
+상태는 `INDEX.md`와 웹 대시보드에 반영된다.
+
+```bash
+ksh-run \
+  --project lvsm \
+  --gpu 0,1 \
+  --goal "768-token baseline" \
+  --architecture "Encoder -> 768 Tokens -> DiT -> Decoder" \
+  --dataset "miniworld-eye-static/v1" \
+  --workdir /root/work/miniworld-eye-static \
+  -- python train.py --config configs/train.yaml
+```
+
+`--smoke`를 붙이면 `/scratch/ksh/tmp/smoke/`에서 실행하고 성공·실패와 관계없이 임시 폴더를
+삭제하며 정식 실험 기록에는 넣지 않는다. 자세한 옵션은 [`runner/README.md`](runner/README.md)를
+참고한다.
+
+## Cloudflare 자동 배포
+
+`main`의 Worker·대시보드 파일이 바뀌면 GitHub Actions가 자동 배포한다. 다음 저장소 설정이
+모두 있어야 배포 작업이 실행된다.
+
+- Variable `CLOUDFLARE_DEPLOY_ENABLED`: `true`
+- Variable `CLOUDFLARE_ACCOUNT_ID`: 배포 대상 Cloudflare account ID
+- Secret `CLOUDFLARE_API_TOKEN`: 해당 계정의 Worker 편집 권한으로 제한한 API token

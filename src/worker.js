@@ -49,7 +49,8 @@ async function heartbeat(request, env) {
       Number(g.memory_used_mib ?? 0), Number(g.memory_total_mib ?? 0), g.temperature_c ?? null, g.power_w ?? null, JSON.stringify(g.processes ?? [])));
   for (const r of body.runs ?? []) statements.push(env.DB.prepare(`INSERT INTO runs
     (run_id,workspace_id,project,purpose,status,gpu_ids,started_at,updated_at,result_path,summary_json)
-    VALUES (?,?,?,?,?,?,?,CURRENT_TIMESTAMP,?,?) ON CONFLICT(run_id) DO UPDATE SET status=excluded.status,gpu_ids=excluded.gpu_ids,
+    VALUES (?,?,?,?,?,?,?,CURRENT_TIMESTAMP,?,?) ON CONFLICT(run_id) DO UPDATE SET workspace_id=excluded.workspace_id,project=excluded.project,
+    purpose=excluded.purpose,status=excluded.status,gpu_ids=excluded.gpu_ids,started_at=excluded.started_at,
     updated_at=CURRENT_TIMESTAMP,result_path=excluded.result_path,summary_json=excluded.summary_json`).bind(String(r.run_id), body.workspace_id,
       String(r.project ?? "unknown"), r.purpose ?? null, String(r.status ?? "unknown"), JSON.stringify(r.gpu_ids ?? []), r.started_at ?? null,
       r.result_path ?? null, JSON.stringify(r.summary ?? {})));

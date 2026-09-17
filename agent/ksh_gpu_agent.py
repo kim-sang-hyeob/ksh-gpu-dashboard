@@ -109,6 +109,26 @@ def link_target(value: str) -> str | None:
     return match.group(1) if match else None
 
 
+def markdown_cells(line: str) -> list[str]:
+    return [cell.replace("\\|", "|").strip() for cell in re.split(r"(?<!\\)\|", line.strip().strip("|"))]
+
+
+def run_metadata(index_path: Path, target: str | None) -> dict:
+    """Load a small meta.json only when the index link stays inside /root/runs."""
+    if not target:
+        return {}
+    try:
+        result_path = (index_path.parent / target).resolve()
+        result_path.relative_to(index_path.parent.resolve())
+        meta_path = result_path.parent / "meta.json"
+        if not meta_path.is_file() or meta_path.stat().st_size > 4096:
+            return {}
+        value = json.loads(meta_path.read_text(encoding="utf-8"))
+        return value if isinstance(value, dict) else {}
+    except (OSError, ValueError, json.JSONDecodeError):
+        return {}
+
+
 def collect_runs(index_path: str = "/root/runs/INDEX.md") -> list[dict]:
     path = Path(index_path)
     if not path.is_file():
@@ -117,21 +137,32 @@ def collect_runs(index_path: str = "/root/runs/INDEX.md") -> list[dict]:
     for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
         if not line.startswith("|"):
             continue
-        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        cells = markdown_cells(line)
         if len(cells) < 7 or cells[0] in {"실험 ID", "Run ID"} or set(cells[0]) <= {"-", ":"}:
             continue
         run_id, purpose, _baseline, status, gpu_ids, updated_at, result = cells[:7]
         target = link_target(result)
-        project = (target.split("/", 1)[0] if target else "unknown") or "unknown"
+        meta = run_metadata(path, target)
+        parsed_run_id = plain_cell(run_id)
+        parsed_gpu_ids = [] if plain_cell(gpu_ids).upper() == "CPU" else re.findall(r"\d+", plain_cell(gpu_ids))
+        project = meta.get("project") or ((target.split("/", 1)[0] if target else "unknown") or "unknown")
         runs.append({
-            "run_id": plain_cell(run_id),
+            "run_id": meta.get("run_id") or parsed_run_id,
             "project": project,
-            "purpose": plain_cell(purpose),
-            "status": plain_cell(status).lower(),
-            "gpu_ids": [] if plain_cell(gpu_ids).upper() == "CPU" else re.findall(r"\d+", plain_cell(gpu_ids)),
-            "started_at": timestamp_from_run_id(plain_cell(run_id)),
+            "purpose": meta.get("goal") or plain_cell(purpose),
+            "status": str(meta.get("status") or plain_cell(status)).lower(),
+            "gpu_ids": [str(item) for item in meta.get("gpu_ids", parsed_gpu_ids)],
+            "started_at": meta.get("started_at") or timestamp_from_run_id(parsed_run_id),
             "result_path": str((path.parent / target).resolve()) if target else None,
-            "summary": {"last_checked": plain_cell(updated_at)},
+            "summary": {
+                "architecture": meta.get("architecture"),
+                "dataset": meta.get("dataset"),
+                "ended_at": meta.get("ended_at"),
+                "exit_code": meta.get("exit_code"),
+                "code_commit": meta.get("code_commit"),
+                "resume_count": meta.get("resume_count"),
+                "last_checked": meta.get("updated_at") or plain_cell(updated_at),
+            },
         })
     return runs[-40:]
 
