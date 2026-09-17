@@ -1,0 +1,18 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ksh-gpu-dashboard",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-09-17",
+  "workers_dev": true,
+  "observability": { "enabled": true },
+  "rules": [
+    { "type": "Text", "globs": ["**/*.html"], "fallthrough": true }
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "ksh-gpu-dashboard-db",
+      "database_id": "8ae14da6-0d3f-4915-8613-6a25b019e6dc"
+    }
+  ]
+}

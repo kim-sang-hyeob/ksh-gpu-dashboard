@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+agent_dir=/root/work/ksh-gpu-agent
+config_file=/root/.config/ksh-gpu-agent/env
+state_dir=/root/runs/_system/ksh-gpu-agent
+pid_file="$state_dir/agent.pid"
+log_file="$state_dir/agent.log"
+
+load_config() {
+    [[ -r "$config_file" ]] || { echo "Missing $config_file" >&2; exit 1; }
+    set -a
+    # shellcheck disable=SC1090
+    source "$config_file"
+    set +a
+}
+
+running_pid() {
+    [[ -r "$pid_file" ]] || return 1
+    local pid
+    pid=$(cat "$pid_file")
+    [[ "$pid" =~ ^[0-9]+$ ]] || return 1
+    kill -0 "$pid" 2>/dev/null || return 1
+    tr '\0' ' ' < "/proc/$pid/cmdline" | grep -Fq "$agent_dir/ksh_gpu_agent.py" || return 1
+    printf '%s\n' "$pid"
+}
+
+case "${1:-status}" in
+    collect)
+        load_config
+        exec /usr/bin/python3 "$agent_dir/ksh_gpu_agent.py" --once --stdout
+        ;;
+    once)
+        load_config
+        exec /usr/bin/python3 "$agent_dir/ksh_gpu_agent.py" --once
+        ;;
+    start)
+        mkdir -p "$state_dir"
+        if pid=$(running_pid); then
+            echo "Already running (pid $pid)"
+            exit 0
+        fi
+        load_config
+        nohup /usr/bin/python3 "$agent_dir/ksh_gpu_agent.py" >> "$log_file" 2>&1 </dev/null &
+        pid=$!
+        printf '%s\n' "$pid" > "$pid_file"
+        sleep 1
+        kill -0 "$pid"
+        echo "Started (pid $pid, log $log_file)"
+        ;;
+    stop)
+        if pid=$(running_pid); then
+            kill "$pid"
+            rm -f "$pid_file"
+            echo "Stopped (pid $pid)"
+        else
+            rm -f "$pid_file"
+            echo "Not running"
+        fi
+        ;;
+    status)
+        if pid=$(running_pid); then
+            echo "Running (pid $pid)"
+            tail -n 3 "$log_file" 2>/dev/null || true
+        else
+            echo "Not running"
+            exit 1
+        fi
+        ;;
+    *)
+        echo "Usage: $0 {collect|once|start|stop|status}" >&2
+        exit 2
+        ;;
+esac
+
